@@ -77,10 +77,7 @@ class ParseError(Error):
 
 class TextWriter(object):
   def __init__(self, as_utf8):
-    if six.PY2:
-      self._writer = io.BytesIO()
-    else:
-      self._writer = io.StringIO()
+    self._writer = io.BytesIO() if six.PY2 else io.StringIO()
 
   def write(self, val):
     if six.PY2:
@@ -126,9 +123,7 @@ def MessageToString(message, as_utf8=False, as_one_line=False,
                float_format=float_format)
   result = out.getvalue()
   out.close()
-  if as_one_line:
-    return result.rstrip()
-  return result
+  return result.rstrip() if as_one_line else result
 
 def _IsMapEntry(field):
   return (field.type == descriptor.FieldDescriptor.TYPE_MESSAGE and
@@ -219,7 +214,7 @@ def PrintFieldValue(field, value, out, indent=0, as_utf8=False,
 
   if field.cpp_type == descriptor.FieldDescriptor.CPPTYPE_MESSAGE:
     if as_one_line:
-      out.write(' %s ' % openb)
+      out.write(f' {openb} ')
       PrintMessage(value, out, indent, as_utf8, as_one_line,
                    pointy_brackets=pointy_brackets,
                    use_index_order=use_index_order,
@@ -377,18 +372,17 @@ def _MergeField(tokenizer, message, allow_multiple_scalars):
 
     if not message_descriptor.is_extendable:
       raise tokenizer.ParseErrorPreviousToken(
-          'Message type "%s" does not have extensions.' %
-          message_descriptor.full_name)
+          f'Message type "{message_descriptor.full_name}" does not have extensions.'
+      )
     # pylint: disable=protected-access
     field = message.Extensions._FindExtensionByName(name)
     # pylint: enable=protected-access
     if not field:
-      raise tokenizer.ParseErrorPreviousToken(
-          'Extension "%s" not registered.' % name)
+      raise tokenizer.ParseErrorPreviousToken(f'Extension "{name}" not registered.')
     elif message_descriptor != field.containing_type:
       raise tokenizer.ParseErrorPreviousToken(
-          'Extension "%s" does not extend message type "%s".' % (
-              name, message_descriptor.full_name))
+          f'Extension "{name}" does not extend message type "{message_descriptor.full_name}".'
+      )
     tokenizer.Consume(']')
   else:
     name = tokenizer.ConsumeIdentifier()
@@ -408,8 +402,8 @@ def _MergeField(tokenizer, message, allow_multiple_scalars):
 
     if not field:
       raise tokenizer.ParseErrorPreviousToken(
-          'Message type "%s" has no field named "%s".' % (
-              message_descriptor.full_name, name))
+          f'Message type "{message_descriptor.full_name}" has no field named "{name}".'
+      )
 
   if field.cpp_type == descriptor.FieldDescriptor.CPPTYPE_MESSAGE:
     is_map_entry = _IsMapEntry(field)
@@ -437,7 +431,7 @@ def _MergeField(tokenizer, message, allow_multiple_scalars):
 
     while not tokenizer.TryConsume(end_token):
       if tokenizer.AtEnd():
-        raise tokenizer.ParseErrorPreviousToken('Expected "%s".' % (end_token))
+        raise tokenizer.ParseErrorPreviousToken(f'Expected "{end_token}".')
       _MergeField(tokenizer, sub_message, allow_multiple_scalars)
 
     if is_map_entry:
@@ -507,21 +501,19 @@ def _MergeScalarField(tokenizer, message, field, allow_multiple_scalars):
       message.Extensions[field].append(value)
     else:
       getattr(message, field.name).append(value)
-  else:
-    if field.is_extension:
-      if not allow_multiple_scalars and message.HasExtension(field):
-        raise tokenizer.ParseErrorPreviousToken(
-            'Message type "%s" should not have multiple "%s" extensions.' %
-            (message.DESCRIPTOR.full_name, field.full_name))
-      else:
-        message.Extensions[field] = value
+  elif field.is_extension:
+    if not allow_multiple_scalars and message.HasExtension(field):
+      raise tokenizer.ParseErrorPreviousToken(
+          f'Message type "{message.DESCRIPTOR.full_name}" should not have multiple "{field.full_name}" extensions.'
+      )
     else:
-      if not allow_multiple_scalars and message.HasField(field.name):
-        raise tokenizer.ParseErrorPreviousToken(
-            'Message type "%s" should not have multiple "%s" fields.' %
-            (message.DESCRIPTOR.full_name, field.name))
-      else:
-        setattr(message, field.name, value)
+      message.Extensions[field] = value
+  elif not allow_multiple_scalars and message.HasField(field.name):
+    raise tokenizer.ParseErrorPreviousToken(
+        f'Message type "{message.DESCRIPTOR.full_name}" should not have multiple "{field.name}" fields.'
+    )
+  else:
+    setattr(message, field.name, value)
 
 
 class _Tokenizer(object):
@@ -608,7 +600,7 @@ class _Tokenizer(object):
       ParseError: If the text couldn't be consumed.
     """
     if not self.TryConsume(token):
-      raise self._ParseError('Expected "%s".' % token)
+      raise self._ParseError(f'Expected "{token}".')
 
   def ConsumeIdentifier(self):
     """Consumes protocol message field identifier.
@@ -814,8 +806,7 @@ class _Tokenizer(object):
       self.token = ''
       return
 
-    match = self._TOKEN.match(self._current_line, self._column)
-    if match:
+    if match := self._TOKEN.match(self._current_line, self._column):
       token = match.group(0)
       self.token = token
     else:
@@ -841,10 +832,7 @@ def ParseInteger(text, is_signed=False, is_long=False):
     # We force 32-bit values to int and 64-bit values to long to make
     # alternate implementations where the distinction is more significant
     # (e.g. the C++ implementation) simpler.
-    if is_long:
-      result = long(text, 0)
-    else:
-      result = int(text, 0)
+    result = long(text, 0) if is_long else int(text, 0)
   except ValueError:
     raise ValueError('Couldn\'t parse integer: %s' % text)
 
@@ -872,10 +860,7 @@ def ParseFloat(text):
   except ValueError:
     # Check alternative spellings.
     if _FLOAT_INFINITY.match(text):
-      if text[0] == '-':
-        return float('-inf')
-      else:
-        return float('inf')
+      return float('-inf') if text[0] == '-' else float('inf')
     elif _FLOAT_NAN.match(text):
       return float('nan')
     else:
@@ -930,8 +915,8 @@ def ParseEnum(field, value):
     enum_value = enum_descriptor.values_by_name.get(value, None)
     if enum_value is None:
       raise ValueError(
-          'Enum type "%s" has no value named %s.' % (
-              enum_descriptor.full_name, value))
+          f'Enum type "{enum_descriptor.full_name}" has no value named {value}.'
+      )
   else:
     # Numeric value.
     enum_value = enum_descriptor.values_by_number.get(number, None)
