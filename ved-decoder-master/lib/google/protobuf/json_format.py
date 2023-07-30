@@ -30,6 +30,7 @@
 
 """Contains routines for printing protocol messages in JSON format."""
 
+
 __author__ = 'jieluo@google.com (Jie Luo)'
 
 import base64
@@ -52,16 +53,9 @@ _INT64_TYPES = frozenset([descriptor.FieldDescriptor.CPPTYPE_INT64,
                           descriptor.FieldDescriptor.CPPTYPE_UINT64])
 _FLOAT_TYPES = frozenset([descriptor.FieldDescriptor.CPPTYPE_FLOAT,
                           descriptor.FieldDescriptor.CPPTYPE_DOUBLE])
-if str is bytes:
-  _UNICODETYPE = unicode
-else:
-  _UNICODETYPE = str
-
-
+_UNICODETYPE = unicode if str is bytes else str
 class SerializeToJsonError(Exception):
   """Thrown if serialization to JSON fails."""
-
-
 class ParseError(Exception):
   """Thrown in case of parsing error."""
 
@@ -116,10 +110,7 @@ def _RegularMessageToJsonObject(message, including_default_value_fields):
         js_map = {}
         for key in value:
           if isinstance(key, bool):
-            if key:
-              recorded_key = 'true'
-            else:
-              recorded_key = 'false'
+            recorded_key = 'true' if key else 'false'
           else:
             recorded_key = key
           js_map[recorded_key] = _ConvertFieldToJsonObject(
@@ -127,11 +118,11 @@ def _RegularMessageToJsonObject(message, including_default_value_fields):
               value[key], including_default_value_fields)
         js[name] = js_map
       elif field.label == descriptor.FieldDescriptor.LABEL_REPEATED:
-        # Convert a repeated field.
-        repeated = []
-        for element in value:
-          repeated.append(_ConvertFieldToJsonObject(
-              field, element, including_default_value_fields))
+        repeated = [
+            _ConvertFieldToJsonObject(field, element,
+                                      including_default_value_fields)
+            for element in value
+        ]
         js[name] = repeated
       else:
         js[name] = _ConvertFieldToJsonObject(
@@ -183,18 +174,12 @@ def _ConvertFieldToJsonObject(
     else:
       return value
   elif field.cpp_type == descriptor.FieldDescriptor.CPPTYPE_BOOL:
-    if value:
-      return True
-    else:
-      return False
+    return bool(value)
   elif field.cpp_type in _INT64_TYPES:
     return str(value)
   elif field.cpp_type in _FLOAT_TYPES:
     if math.isinf(value):
-      if value < 0.0:
-        return '-Infinity'
-      else:
-        return 'Infinity'
+      return '-Infinity' if value < 0.0 else 'Infinity'
     if math.isnan(value):
       return 'NaN'
   return value
@@ -214,7 +199,7 @@ def _TimestampMessageToJsonObject(message):
   if (nanos % 1e9) == 0:
     # If there are 0 fractional digits, the fractional
     # point '.' should be omitted when serializing.
-    return result + 'Z'
+    return f'{result}Z'
   if (nanos % 1e6) == 0:
     # Serialize 3 fractional digits.
     return result + '.%03dZ' % (nanos / 1e6)
@@ -244,7 +229,7 @@ def _DurationMessageToJsonObject(message):
   if (nanos % 1e9) == 0:
     # If there are 0 fractional digits, the fractional
     # point '.' should be omitted when serializing.
-    return result + 's'
+    return f'{result}s'
   if (nanos % 1e6) == 0:
     # Serialize 3 fractional digits.
     return result + '.%03ds' % (nanos / 1e6)
@@ -285,7 +270,7 @@ def _DuplicateChecker(js):
   result = {}
   for name, value in js:
     if name in result:
-      raise ParseError('Failed to load JSON: duplicate key ' + name)
+      raise ParseError(f'Failed to load JSON: duplicate key {name}')
     result[name] = value
   return result
 
@@ -311,7 +296,7 @@ def Parse(text, message):
     else:
       js = json.loads(text, object_pairs_hook=_DuplicateChecker)
   except ValueError as e:
-    raise ParseError('Failed to load JSON: ' + str(e))
+    raise ParseError(f'Failed to load JSON: {str(e)}')
   _ConvertFieldValuePair(js, message)
   return message
 
@@ -382,9 +367,7 @@ def _ConvertFieldValuePair(js, message):
         raise ParseError('Failed to parse {0} field: {1}'.format(name, e))
       else:
         raise ParseError(str(e))
-    except ValueError as e:
-      raise ParseError('Failed to parse {0} field: {1}'.format(name, e))
-    except TypeError as e:
+    except (ValueError, TypeError) as e:
       raise ParseError('Failed to parse {0} field: {1}'.format(name, e))
 
 
@@ -421,7 +404,7 @@ def _ConvertTimestampMessage(value, message):
   if timezone_offset == -1:
     raise ParseError(
         'Failed to parse timestamp: missing valid timezone offset.')
-  time_value = value[0:timezone_offset]
+  time_value = value[:timezone_offset]
   # Parse datetime and nanos
   point_position = time_value.find('.')
   if point_position == -1:
@@ -437,10 +420,7 @@ def _ConvertTimestampMessage(value, message):
     raise ParseError(
         'Failed to parse Timestamp: nanos {0} more than '
         '9 fractional digits.'.format(nano_value))
-  if nano_value:
-    nanos = round(float('0.' + nano_value) * 1e9)
-  else:
-    nanos = 0
+  nanos = round(float(f'0.{nano_value}') * 1e9) if nano_value else 0
   # Parse timezone offsets
   if value[timezone_offset] == 'Z':
     if len(value) != timezone_offset + 1:
@@ -450,8 +430,7 @@ def _ConvertTimestampMessage(value, message):
     timezone = value[timezone_offset:]
     pos = timezone.find(':')
     if pos == -1:
-      raise ParseError(
-          'Invalid timezone offset value: ' + timezone)
+      raise ParseError(f'Invalid timezone offset value: {timezone}')
     if timezone[0] == '+':
       seconds += (int(timezone[1:pos])*60+int(timezone[pos+1:]))*60
     else:
@@ -464,8 +443,7 @@ def _ConvertTimestampMessage(value, message):
 def _ConvertDurationMessage(value, message):
   """Convert a JSON representation into Duration message."""
   if value[-1] != 's':
-    raise ParseError(
-        'Duration must end with letter "s": ' + value)
+    raise ParseError(f'Duration must end with letter "s": {value}')
   try:
     duration = float(value[:-1])
   except ValueError:

@@ -71,7 +71,7 @@ LINK_TYPES = {
 def try_decode(s):
     ''' try to base64 decode s. return None, if decoding fails '''
     try:
-        return base64.b64decode(str(s)+'=====', '_-')
+        return base64.b64decode(f'{str(s)}=====', '_-')
     except TypeError:
         return None
 
@@ -97,10 +97,7 @@ def decode_ved_protobuf(s):
     try:
         ved.ParseFromString(decoded)
 
-        ret = {}
-        for k, v in ved.ListFields():
-            ret[k.name] = v
-        return ret
+        return {k.name: v for k, v in ved.ListFields()}
     except DecodeError:
         return None
 
@@ -117,7 +114,7 @@ def decode_ved(s):
 
 def format_type(type):
     type_name = LINK_TYPES.get(type, 'unknown')
-    return '%s (%s)' % (type_name, type)
+    return f'{type_name} ({type})'
 
 
 def format_ved(ved):
@@ -127,10 +124,10 @@ def format_ved(ved):
         if 'link_type' in ved:
             ved['link_type'] = format_type(ved['link_type'])
         if 'mysterious_msg' in ved:
-            filth = ""
-            for k, v in ved['mysterious_msg'].ListFields():
-                # ved['mysterious_msg'][k.name] = v
-                filth += str(v).replace("\n", ", ")
+            filth = "".join(
+                str(v).replace("\n", ", ")
+                for k, v in ved['mysterious_msg'].ListFields()
+            )
             ved['mysterious_msg'] = filth
 
     return ved

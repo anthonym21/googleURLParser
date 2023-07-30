@@ -200,7 +200,7 @@ class SymbolDatabase(object):
 
     result = {}
     for f in files:
-      result.update(self._symbols_by_file[f])
+      result |= self._symbols_by_file[f]
     return result
 
 _DEFAULT = SymbolDatabase._CreateDefaultDatabase()

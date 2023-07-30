@@ -54,14 +54,14 @@ parser.add_option("-q", dest="quiet",
 (options, args) = parser.parse_args()
 
 if not (options.quiet):
-    print ("Running " + version_string + "\n")
+    print(f"Running {version_string}" + "\n")
 
 # No arguments given by user, print help and exit
 if len(sys.argv) == 1:
     parser.print_help()
     exit(-1)
 
-if ((options.eiterm == None) and (options.url == None)):
+if options.eiterm is None and options.url is None:
     print ("Error! Neither ei or URL terms were specified. Choose one!\n")
     parser.print_help()
     exit(-1)
@@ -88,11 +88,11 @@ if (options.url != None):
     ei = urlparse.parse_qs(parsed.query)["ei"][0]
     #ei = urlparse.parse_qs(parsed.query)["ei"][0]
     if not (options.quiet):
-        print ("URL's ei term = " + ei)
+        print(f"URL's ei term = {ei}")
 else:
     ei = options.eiterm
     if not (options.quiet):
-        print ("Input ei term = " + ei)
+        print(f"Input ei term = {ei}")
 
 # ei parameter may require padding (length must be a multiple of 4 for Python's base64 decode)
 num_extra_bytes = (len(ei) % 4) # equals number of extra bytes past last multiple of 4 eg equals 1 for ei length of 21
@@ -103,7 +103,7 @@ else:
     padstring = ei
 
 if not (options.quiet):
-    print ("Padded base64 string = " + padstring)
+    print(f"Padded base64 string = {padstring}")
 
 # Apparently the base64 string are made URL safe by substituting - instead of + and _ instead of /
 # Python base64 conveniently has a "urlsafe_b64decode" function to handle the reverse of the above substitution
@@ -124,7 +124,7 @@ timestamp = (decoded[0]) + (decoded[1])*256 + (decoded[2])*(256**2) + (decoded[3
 #timestamp = ord(decoded[0]) + ord(decoded[1])*256 + ord(decoded[2])*(256**2) + ord(decoded[3])*(256**3)
 
 if not (options.quiet):
-    print ("Extracted timestamp = " + str(timestamp))
+    print(f"Extracted timestamp = {str(timestamp)}")
 
 try: 
     datetimestr = datetime.datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%dT%H:%M:%S')
@@ -132,7 +132,7 @@ except:
     datetimestr = "Unknown"
 
 if not (options.quiet):
-    print ("Human readable timestamp (UTC) = " + datetimestr)
+    print(f"Human readable timestamp (UTC) = {datetimestr}")
 else:
     print (datetimestr)
 

@@ -5,7 +5,7 @@ import sys
 
 def try_decode(s):
   try:
-    return base64.b64decode(s+'=====', '_-')
+    return base64.b64decode(f'{s}=====', '_-')
   except TypeError:
     return None
 
